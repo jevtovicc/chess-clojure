@@ -1,5 +1,15 @@
 (ns clojure-chess.core)
 
+;; utils
+(defn my-any?
+  "Returns true if some element in coll satisfies predicate"
+  [pred col]
+  (not (not-any? pred col)))
+
+(defn take-while-including [pred coll]
+  (let [[take-while-part remainding-part] (split-with pred coll)]
+    (concat take-while-part [(first remainding-part)])))
+
 (def initial-board [[:r :n :b :q :k :b :n :r]
                     [:p :p :p :p :p :p :p :p]
                     [:e :e :e :e :e :e :e :e]
@@ -62,10 +72,6 @@
 (def knight-directions [[2 1] [2 -1] [1 2] [1 -2]
                         [-2 1] [-2 -1] [-1 2] [-1 -2]])
 
-(defn take-while-including [pred coll]
-  (let [[take-while-part remainding-part] (split-with pred coll)]
-    (concat take-while-part [(first remainding-part)])))
-
 (defn add-squares [sq1 sq2]
   (map + sq1 sq2))
 
@@ -75,68 +81,64 @@
   [board from-sq]
   (->> (map (partial add-squares from-sq) knight-directions)
        (filter square-on-board?)
-       (remove #(same-piece-color? :n (get-piece board %)))))
+       (remove #(same-piece-color? :n (get-piece board %)))
+       set))
 
 (defmethod get-pseudolegal-destinations :N
   [board from-sq]
   (->> (map (partial add-squares from-sq) knight-directions)
        (filter square-on-board?)
-       (remove #(same-piece-color? :N (get-piece board %)))))
-
-(get-pseudolegal-destinations initial-board [0 1])
+       (remove #(same-piece-color? :N (get-piece board %)))
+       set))
 
 (defn get-pieces-in-row [board row]
   (board row))
 
-
-;; TODO: find more functional implementation
 (defn get-squares-in-direction [board from-sq dir]
   (let [piece (get-piece board from-sq)]
-    (->> (loop [to-sq (add-squares from-sq dir)
-                acc []]
-           (if-not (square-empty? board to-sq)
-             (conj acc to-sq)
-             (recur (add-squares to-sq dir) (conj acc to-sq))))
+    (->> (iterate (partial add-squares dir) (add-squares from-sq dir))
+         (take-while-including (partial square-empty? board))
          (filter square-on-board?)
          (remove #(same-piece-color? piece (get-piece board %))))))
-
 
 ;; TODO: remove repetition. Multimethod dispatch on alternatives (eg. :r | :R) ???
 (defmethod get-pseudolegal-destinations :r
   [board from-sq]
-  (mapcat (partial get-squares-in-direction board from-sq) rook-directions))
+  (set (mapcat (partial get-squares-in-direction board from-sq) rook-directions)))
 
 (defmethod get-pseudolegal-destinations :R
   [board from-sq]
-  (mapcat (partial get-squares-in-direction board from-sq) rook-directions))
+  (set (mapcat (partial get-squares-in-direction board from-sq) rook-directions)))
 
 (defmethod get-pseudolegal-destinations :b
   [board from-sq]
-  (mapcat (partial get-squares-in-direction board from-sq) bishop-directions))
+  (set (mapcat (partial get-squares-in-direction board from-sq) bishop-directions)))
 
 (defmethod get-pseudolegal-destinations :B
   [board from-sq]
-  (mapcat (partial get-squares-in-direction board from-sq) bishop-directions))
+  (set (mapcat (partial get-squares-in-direction board from-sq) bishop-directions)))
 
 (defmethod get-pseudolegal-destinations :q
   [board from-sq]
-  (mapcat (partial get-squares-in-direction board from-sq) all-directions))
+  (set (mapcat (partial get-squares-in-direction board from-sq) all-directions)))
 
 (defmethod get-pseudolegal-destinations :Q
   [board from-sq]
-  (mapcat (partial get-squares-in-direction board from-sq) all-directions))
+  (set (mapcat (partial get-squares-in-direction board from-sq) all-directions)))
 
 (defmethod get-pseudolegal-destinations :k
   [board from-sq]
   (->> (map (partial add-squares from-sq) all-directions)
        (filter square-on-board?)
-       (remove #(same-piece-color? :k (get-piece board %)))))
+       (remove #(same-piece-color? :k (get-piece board %)))
+       set))
 
 (defmethod get-pseudolegal-destinations :K
   [board from-sq]
   (->> (map (partial add-squares from-sq) all-directions)
        (filter square-on-board?)
-       (remove #(same-piece-color? :K (get-piece board %)))))
+       (remove #(same-piece-color? :K (get-piece board %)))
+       set))
 
 ;; TODO: implement function body
 (defmethod get-pseudolegal-destinations :p
@@ -148,38 +150,21 @@
   [board from-sq]
   [])
 
-(get-pseudolegal-destinations (move-piece initial-board [0 0] [3 2]) [3 2])
-;; => ((3 1) (3 0) (3 3) (3 4) (3 5) (3 6) (3 7) (4 2) (5 2) (6 2) (2 2))
+(defn occupied-squares [board]
+  (remove (partial square-empty? board) all-squares))
 
-(get-pseudolegal-destinations (move-piece initial-board [0 2] [3 2]) [3 2])
-;; => ((4 1) (5 0) (4 3) (5 4) (6 5) (2 1) (2 3))
+(defn squares-attacked-by-player [board player]
+  (->> (occupied-squares board)
+       (filter (fn [sq] (= player (piece-color (get-piece board sq)))))
+       (mapcat (partial get-pseudolegal-destinations board))
+       set))
 
-(get-pseudolegal-destinations (move-piece initial-board [0 3] [3 2]) [3 2])
-;; => ((3 1) (3 0) (3 3) (3 4) (3 5) (3 6) (3 7) (4 2) (5 2) (6 2) (2 2) (4 1) (5 0) (4 3) (5 4) (6 5) (2 1) (2 3))
-;; TODO: implement function body
-
-
-
-(get-pseudolegal-destinations (move-piece initial-board [0 4] [2 2]) [2 2])
-
-;; TODO: fix implementation
-(defn squares-attacked-by-opponent [board player-on-move]
-  (->> (filter (fn [sq] (= player-on-move (piece-color (get-piece board sq)))) all-squares)
-       (mapcat (partial get-pseudolegal-destinations board))))
-
-(squares-attacked-by-opponent initial-board :white)
-
-;; TODO: fix implementation
 (defn in-check? [board player]
-  (let [attacked-king (condp = player
-                        :white :K
-                        :black :k)]
-    (->> (squares-attacked-by-opponent board player)
-         (filter (fn [sq] (= attacked-king (get-piece board sq))))
-         seq?)))
-
-(in-check? (move-piece (move-piece initial-board [0 4] [3 2]) [7 2] [5 0]) :white)
-;; => true
+  (let [[attacked-king opponent] (condp = player
+                                   :white [:K :black]
+                                   :black [:k :white])]
+    (->> (squares-attacked-by-player board opponent)
+         (my-any? (fn [sq] (= attacked-king (get-piece board sq)))))))
 
 
 
