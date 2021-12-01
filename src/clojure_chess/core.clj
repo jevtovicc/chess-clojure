@@ -1,14 +1,5 @@
-(ns clojure-chess.core)
-
-;; utils
-(defn my-any?
-  "Returns true if some element in coll satisfies predicate"
-  [pred col]
-  (not (not-any? pred col)))
-
-(defn take-while-including [pred coll]
-  (let [[take-while-part remainding-part] (split-with pred coll)]
-    (concat take-while-part [(first remainding-part)])))
+(ns clojure-chess.core
+  (:require [clojure-chess.utils :refer [my-any? take-while-including]]))
 
 (def initial-board [[:r :n :b :q :k :b :n :r]
                     [:p :p :p :p :p :p :p :p]
@@ -79,14 +70,16 @@
 
 (defmethod get-pseudolegal-destinations :n
   [board from-sq]
-  (->> (map (partial add-squares from-sq) knight-directions)
+  (->> knight-directions
+       (map (partial add-squares from-sq))
        (filter square-on-board?)
        (remove #(same-piece-color? :n (get-piece board %)))
        set))
 
 (defmethod get-pseudolegal-destinations :N
   [board from-sq]
-  (->> (map (partial add-squares from-sq) knight-directions)
+  (->> knight-directions
+       (map (partial add-squares from-sq))
        (filter square-on-board?)
        (remove #(same-piece-color? :N (get-piece board %)))
        set))
@@ -96,7 +89,8 @@
 
 (defn get-squares-in-direction [board from-sq dir]
   (let [piece (get-piece board from-sq)]
-    (->> (iterate (partial add-squares dir) (add-squares from-sq dir))
+    (->> (add-squares from-sq dir)
+         (iterate (partial add-squares dir))
          (take-while-including (partial square-empty? board))
          (filter square-on-board?)
          (remove #(same-piece-color? piece (get-piece board %))))))
@@ -128,33 +122,72 @@
 
 (defmethod get-pseudolegal-destinations :k
   [board from-sq]
-  (->> (map (partial add-squares from-sq) all-directions)
+  (->> all-directions
+       (map (partial add-squares from-sq))
        (filter square-on-board?)
        (remove #(same-piece-color? :k (get-piece board %)))
        set))
 
 (defmethod get-pseudolegal-destinations :K
   [board from-sq]
-  (->> (map (partial add-squares from-sq) all-directions)
+  (->> all-directions
+       (map (partial add-squares from-sq))
        (filter square-on-board?)
        (remove #(same-piece-color? :K (get-piece board %)))
        set))
 
-;; TODO: implement function body
+
+;; TODO: find more functional implementation
 (defmethod get-pseudolegal-destinations :p
   [board from-sq]
-  [])
+  (let [not-moved? (= (first from-sq) 1)
+        one-up (add-squares dir-up from-sq)
+        two-up (add-squares dir-up one-up)
+        one-up-right (add-squares dir-up-right from-sq)
+        one-up-left (add-squares dir-up-left from-sq)]
+    (->> [(when (square-empty? board one-up)
+            one-up)
+          (when (and not-moved? (square-empty? board one-up) (square-empty? board two-up))
+            two-up)
+          (when (and (not (square-empty? board one-up-left))
+                     (not (same-piece-color? :p (get-piece board one-up-left))))
+            one-up-left)
+          (when (and (not (square-empty? board one-up-right))
+                     (not (same-piece-color? :p (get-piece board one-up-right))))
+            one-up-right)]
+         (keep identity)
+         (filter square-on-board?)
+         set)))
 
-;; TODO: implement function body
+;; TODO: find more functional implementation
 (defmethod get-pseudolegal-destinations :P
   [board from-sq]
-  [])
+  (let [not-moved? (= (first from-sq) 6)
+        one-down (add-squares dir-down from-sq)
+        two-down (add-squares dir-down one-down)
+        one-down-right (add-squares dir-down-right from-sq)
+        one-down-left (add-squares dir-down-left from-sq)]
+    (->> [(when (square-empty? board one-down)
+            one-down)
+          (when (and not-moved? (square-empty? board one-down) (square-empty? board two-down))
+            two-down)
+          (when (and (not (square-empty? board one-down-left))
+                     (not (same-piece-color? :P (get-piece board one-down-left))))
+            one-down-left)
+          (when (and (not (square-empty? board one-down-right))
+                     (not (same-piece-color? :P (get-piece board one-down-right))))
+            one-down-right)]
+         (keep identity)
+         (filter square-on-board?)
+         set)))
+
 
 (defn occupied-squares [board]
   (remove (partial square-empty? board) all-squares))
 
 (defn squares-attacked-by-player [board player]
-  (->> (occupied-squares board)
+  (->> board
+       occupied-squares
        (filter (fn [sq] (= player (piece-color (get-piece board sq)))))
        (mapcat (partial get-pseudolegal-destinations board))
        set))
@@ -165,7 +198,3 @@
                                    :black [:k :white])]
     (->> (squares-attacked-by-player board opponent)
          (my-any? (fn [sq] (= attacked-king (get-piece board sq)))))))
-
-
-
-
