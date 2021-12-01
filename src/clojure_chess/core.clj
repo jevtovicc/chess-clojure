@@ -198,3 +198,13 @@
                                    :black [:k :white])]
     (->> (squares-attacked-by-player board opponent)
          (my-any? (fn [sq] (= attacked-king (get-piece board sq)))))))
+
+(defn in-check-after-move? [board player from-sq to-sq]
+  (in-check? (move-piece board from-sq to-sq) player))
+
+(defn get-legal-destinations [board player from-sq]
+  (->> (get-pseudolegal-destinations board from-sq)
+       (remove (partial in-check-after-move? board player from-sq))
+       set))
+
+

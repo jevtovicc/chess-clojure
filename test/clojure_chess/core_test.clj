@@ -71,3 +71,8 @@
   (testing
       (is (= false
              (in-check? testing-board :white)))))
+
+(deftest get-legal-destinations-test
+  (testing
+   (is (not= (get-pseudolegal-destinations (move-piece testing-board [5 2] [4 0]) [6 2])
+          (get-legal-destinations (move-piece testing-board [5 2] [4 0]) :white [6 2])))))
