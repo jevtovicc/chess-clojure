@@ -11,3 +11,6 @@
   [pred coll]
   (let [[take-while-part remainding-part] (split-with pred coll)]
     (concat take-while-part [(first remainding-part)])))
+
+(defn char->kw [ch]
+  (keyword (str ch)))

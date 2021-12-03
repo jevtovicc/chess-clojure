@@ -1,6 +1,6 @@
 (ns clojure-chess.core-test
   (:require [clojure.test :refer :all]
-            [clojure-chess.core :refer :all]))
+            [clojure-chess.rules :refer :all]))
 
 (deftest a-test
   (testing "FIXME, I fail."
@@ -76,3 +76,11 @@
   (testing
    (is (not= (get-pseudolegal-destinations (move-piece testing-board [5 2] [4 0]) [6 2])
           (get-legal-destinations (move-piece testing-board [5 2] [4 0]) :white [6 2])))))
+
+
+(deftest check-mate?-test
+  (testing
+      (is (= true
+             (check-mate?
+              (fen->board "3rkbnr/1p1bp3/1q1p3p/p5pQ/3n4/PPR5/5PPP/6K1")
+              :black)))))
