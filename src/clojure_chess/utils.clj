@@ -14,3 +14,8 @@
 
 (defn char->kw [ch]
   (keyword (str ch)))
+
+(defn in?
+  "true if coll contains element"
+  [coll x]
+  (some? (some #{x} coll)))

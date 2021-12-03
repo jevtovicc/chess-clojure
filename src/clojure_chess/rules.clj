@@ -1,27 +1,6 @@
 (ns clojure-chess.rules
-  (:require [clojure-chess.utils :refer [my-any? take-while-including char->kw]]
-            [clojure.string :as str]))
-
-
-(defn fen-row->board-row [fen-row]
-  (reduce
-   (fn [acc ch]
-     (if (Character/isLetter ch)
-       (conj acc (char->kw ch))
-       (let [num (Character/digit ch 10)]
-         (apply conj acc (take num (cycle [:e]))))))
-   []
-   fen-row))
-
-(defn fen->board [fen]
-  (-> fen
-      (str/split #"/")
-      (->>
-       (map (partial fen-row->board-row))
-       vec)))
-
-(def starting-fen "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR")
-(def initial-board (fen->board starting-fen))
+  (:require
+   [clojure-chess.utils :refer [my-any? take-while-including]]))
 
 (def white-piece? #{:R :N :B :Q :K :P})
 (def black-piece? #{:r :n :b :q :k :p})
@@ -59,8 +38,16 @@
         (remove-piece from-sq)
         (place-piece to-sq piece))))
 
-;; rules
+(defn occupied-squares [board]
+  (remove (partial square-empty? board) all-squares))
 
+(defn add-squares [sq1 sq2]
+  (map + sq1 sq2))
+
+(defn get-pieces-in-row [board row]
+  (board row))
+
+;; directions
 (def dir-up         [1 0])
 (def dir-down       [-1 0])
 (def dir-right      [0 1])
@@ -76,8 +63,6 @@
 (def knight-directions [[2 1] [2 -1] [1 2] [1 -2]
                         [-2 1] [-2 -1] [-1 2] [-1 -2]])
 
-(defn add-squares [sq1 sq2]
-  (map + sq1 sq2))
 
 (defmulti get-pseudolegal-destinations (fn [board from-sq] (get-piece board from-sq)))
 
@@ -96,9 +81,6 @@
        (filter square-on-board?)
        (remove #(same-piece-color? :N (get-piece board %)))
        set))
-
-(defn get-pieces-in-row [board row]
-  (board row))
 
 (defn get-squares-in-direction [board from-sq dir]
   (let [piece (get-piece board from-sq)]
@@ -192,9 +174,6 @@
          (keep identity)
          (filter square-on-board?)
          set)))
-
-(defn occupied-squares [board]
-  (remove (partial square-empty? board) all-squares))
 
 (defn squares-attacked-by-player [board player]
   (->> board
