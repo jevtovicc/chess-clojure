@@ -42,18 +42,26 @@
       (str/split #"/")
       last
       (str/split #" ")
-      (nth 2)))
+      (get 2)))
+
+(defn en-passant? [fen]
+  (-> fen
+      (str/split #"/")
+      last
+      (str/split #" ")
+      (get 3)))
 
 (defn fen->game-state [fen]
   (let [board (fen->board fen)
         player (get-player-from-fen fen)
         castling-info (get-castling-info-from-fen fen)]
     {:board board
+     :player player
      :white-can-castle-ks? (in? castling-info \K)
      :white-can-castle-qs? (in? castling-info \Q)
      :black-can-castle-ks? (in? castling-info \k)
      :black-can-castle-qs? (in? castling-info \q)
-     :player player}))
+     :en-passant (en-passant? fen)}))
 
 (def starting-fen "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq")
 (def game-state (fen->game-state starting-fen))

@@ -9,6 +9,15 @@
         y (range 8)]
     [x y]))
 
+(def notation->sq {:a1 [7 0] :b1 [7 1] :c1 [7 2] :d1 [7 3] :e1 [7 4] :f1 [7 5] :g1 [7 6] :h1 [7 7]
+                   :a2 [6 0] :b2 [6 1] :c2 [6 2] :d2 [6 3] :e2 [6 4] :f2 [6 5] :g2 [6 6] :h2 [6 7]
+                   :a3 [5 0] :b3 [5 1] :c3 [5 2] :d3 [5 3] :e3 [5 4] :f3 [5 5] :g3 [5 6] :h3 [5 7]
+                   :a4 [4 0] :b4 [4 1] :c4 [4 2] :d4 [4 3] :e4 [4 4] :f4 [4 5] :g4 [4 6] :h4 [4 7]
+                   :a5 [3 0] :b5 [3 1] :c5 [3 2] :d5 [3 3] :e5 [3 4] :f5 [3 5] :g5 [3 6] :h5 [3 7]
+                   :a6 [2 0] :b6 [2 1] :c6 [2 2] :d6 [2 3] :e6 [2 4] :f6 [2 5] :g6 [2 6] :h6 [2 7]
+                   :a7 [1 0] :b7 [1 1] :c7 [1 2] :d7 [1 3] :e7 [1 4] :f7 [1 5] :g7 [1 6] :h7 [1 7]
+                   :a8 [0 0] :b8 [0 1] :c8 [0 2] :d8 [0 3] :e8 [0 4] :f8 [0 5] :g8 [0 6] :h8 [0 7]})
+
 (defn square-empty? [board sq]
   (= (get-in board sq) :e))
 
@@ -64,10 +73,10 @@
                         [-2 1] [-2 -1] [-1 2] [-1 -2]])
 
 
-(defmulti get-pseudolegal-destinations (fn [board from-sq] (get-piece board from-sq)))
+(defmulti get-pseudolegal-destinations (fn [game-state from-sq] (get-piece (:board game-state) from-sq)))
 
 (defmethod get-pseudolegal-destinations :n
-  [board from-sq]
+  [{board :board} from-sq]
   (->> knight-directions
        (map (partial add-squares from-sq))
        (filter square-on-board?)
@@ -75,7 +84,7 @@
        set))
 
 (defmethod get-pseudolegal-destinations :N
-  [board from-sq]
+  [{board :board} from-sq]
   (->> knight-directions
        (map (partial add-squares from-sq))
        (filter square-on-board?)
@@ -92,31 +101,31 @@
 
 ;; TODO: remove repetition. Multimethod dispatch on alternatives (eg. :r | :R) ???
 (defmethod get-pseudolegal-destinations :r
-  [board from-sq]
+  [{:keys [board black-can-castle-ks black-can-castle-qs]} from-sq]
   (set (mapcat (partial get-squares-in-direction board from-sq) rook-directions)))
 
 (defmethod get-pseudolegal-destinations :R
-  [board from-sq]
+  [{:keys [board white-can-castle-ks white-can-castle-qs]} from-sq]
   (set (mapcat (partial get-squares-in-direction board from-sq) rook-directions)))
 
 (defmethod get-pseudolegal-destinations :b
-  [board from-sq]
+  [{board :board} from-sq]
   (set (mapcat (partial get-squares-in-direction board from-sq) bishop-directions)))
 
 (defmethod get-pseudolegal-destinations :B
-  [board from-sq]
+  [{board :board} from-sq]
   (set (mapcat (partial get-squares-in-direction board from-sq) bishop-directions)))
 
 (defmethod get-pseudolegal-destinations :q
-  [board from-sq]
+  [{board :board} from-sq]
   (set (mapcat (partial get-squares-in-direction board from-sq) all-directions)))
 
 (defmethod get-pseudolegal-destinations :Q
-  [board from-sq]
+  [{board :board} from-sq]
   (set (mapcat (partial get-squares-in-direction board from-sq) all-directions)))
 
 (defmethod get-pseudolegal-destinations :k
-  [board from-sq]
+  [{:keys [board black-can-castle-ks black-can-castle-qs]} from-sq]
   (->> all-directions
        (map (partial add-squares from-sq))
        (filter square-on-board?)
@@ -124,7 +133,7 @@
        set))
 
 (defmethod get-pseudolegal-destinations :K
-  [board from-sq]
+  [{:keys [board white-can-castle-ks white-can-castle-qs]} from-sq]
   (->> all-directions
        (map (partial add-squares from-sq))
        (filter square-on-board?)
@@ -133,7 +142,7 @@
 
 ;; TODO: find more functional implementation
 (defmethod get-pseudolegal-destinations :p
-  [board from-sq]
+  [{board :board en-passant :en-passant} from-sq]
   (let [not-moved? (= (first from-sq) 1)
         one-up (add-squares dir-up from-sq)
         two-up (add-squares dir-up one-up)
@@ -148,14 +157,16 @@
             one-up-left)
           (when (and (not (square-empty? board one-up-right))
                      (not (same-piece-color? :p (get-piece board one-up-right))))
-            one-up-right)]
+            one-up-right)
+          (when en-passant
+            ((keyword en-passant) notation->sq))]
          (keep identity)
          (filter square-on-board?)
          set)))
 
 ;; TODO: find more functional implementation
 (defmethod get-pseudolegal-destinations :P
-  [board from-sq]
+  [{board :board en-passant :en-passant} from-sq]
   (let [not-moved? (= (first from-sq) 6)
         one-down (add-squares dir-down from-sq)
         two-down (add-squares dir-down one-down)
@@ -170,38 +181,40 @@
             one-down-left)
           (when (and (not (square-empty? board one-down-right))
                      (not (same-piece-color? :P (get-piece board one-down-right))))
-            one-down-right)]
+            one-down-right)
+          (when en-passant
+            ((keyword en-passant) notation->sq))]
          (keep identity)
          (filter square-on-board?)
          set)))
 
-(defn squares-attacked-by-player [board player]
+;; TODO: change from pseudolegal to legal destinations. Watch for infinite recursion
+(defn squares-attacked-by-player [{board :board :as game-state} player]
   (->> board
        occupied-squares
-       (filter (fn [sq] (= player (piece-color (get-piece board sq)))))
-       (mapcat (partial get-pseudolegal-destinations board))
+       (filter #(= player (piece-color (get-piece board %))))
+       (mapcat (partial get-pseudolegal-destinations game-state))
        set))
 
-(defn in-check? [board player]
+(defn in-check? [{:keys [board player] :as game-state}]
   (let [[attacked-king opponent] (condp = player
                                    :white [:K :black]
                                    :black [:k :white])]
-    (->> (squares-attacked-by-player board opponent)
-         (my-any? (fn [sq] (= attacked-king (get-piece board sq)))))))
+    (->> (squares-attacked-by-player game-state opponent)
+         (my-any? #(= attacked-king (get-piece board %))))))
 
-(defn in-check-after-move? [board player from-sq to-sq]
-  (in-check? (move-piece board from-sq to-sq) player))
+(defn in-check-after-move? [{board :board :as game-state} from-sq to-sq]
+  (in-check? (assoc game-state :board (move-piece board from-sq to-sq))))
 
-(defn get-legal-destinations [board player from-sq]
-  (->> (get-pseudolegal-destinations board from-sq)
-       (remove (partial in-check-after-move? board player from-sq))
+(defn get-legal-destinations [game-state from-sq]
+  (->> (get-pseudolegal-destinations game-state from-sq)
+       (remove (partial in-check-after-move? game-state from-sq))
        set))
 
-(defn check-mate? [board player]
+(defn check-mate? [{:keys [board player] :as game-state}]
   (->> board
        occupied-squares
        (filter (fn [sq] (= (piece-color (get-piece board sq)) player)))
-       (mapcat (partial get-legal-destinations board player))
+       (mapcat (partial get-legal-destinations game-state))
        set
        empty?))
-
