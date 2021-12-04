@@ -135,11 +135,11 @@
 
 ;; TODO: remove repetition. Multimethod dispatch on alternatives (eg. :r | :R) ???
 (defmethod get-pseudolegal-destinations :r
-  [{:keys [board black-can-castle-ks black-can-castle-qs]} from-sq]
+  [{board :board} from-sq]
   (set (mapcat (partial get-squares-in-direction board from-sq) rook-directions)))
 
 (defmethod get-pseudolegal-destinations :R
-  [{:keys [board white-can-castle-ks white-can-castle-qs]} from-sq]
+  [{board :board} from-sq]
   (set (mapcat (partial get-squares-in-direction board from-sq) rook-directions)))
 
 (defmethod get-pseudolegal-destinations :b
@@ -157,22 +157,6 @@
 (defmethod get-pseudolegal-destinations :Q
   [{board :board} from-sq]
   (set (mapcat (partial get-squares-in-direction board from-sq) all-directions)))
-
-;; (defmethod get-pseudolegal-destinations :k
-;;   [{:keys [board black-can-castle-ks black-can-castle-qs]} from-sq]
-;;   (->> all-directions
-;;        (map (partial add-squares from-sq))
-;;        (filter square-on-board?)
-;;        (remove #(same-piece-color? :k (get-piece board %)))
-;;        set))
-
-;; (defmethod get-pseudolegal-destinations :K
-;;   [{:keys [board white-can-castle-ks white-can-castle-qs]} from-sq]
-;;   (->> all-directions
-;;        (map (partial add-squares from-sq))
-;;        (filter square-on-board?)
-;;        (remove #(same-piece-color? :K (get-piece board %)))
-;;        set))
 
 (defmethod get-pseudolegal-destinations :k
   [{:keys [board black-can-castle-ks? black-can-castle-qs?] :as game-state} from-sq]
