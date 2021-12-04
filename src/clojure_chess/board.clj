@@ -19,10 +19,8 @@
   (-> fen
       (str/split #"/")
       (as-> res
-            (conj (vec (butlast res)) (first (str/split (last res) #" "))))
-      (->>
-       (map (partial fen-row->board-row))
-       vec)))
+            (conj (vec (butlast res)) (first (str/split (last res) #" ")))
+        (mapv (partial fen-row->board-row) res))))
 
 (defn fen-player->kw-player [fen-player]
   (condp = fen-player

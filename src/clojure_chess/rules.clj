@@ -56,6 +56,11 @@
 (defn get-pieces-in-row [board row]
   (board row))
 
+(defn get-opponent [player]
+  (condp = player
+    :white :black
+    :black :white))
+
 ;; directions
 (def dir-up         [1 0])
 (def dir-down       [-1 0])
@@ -71,7 +76,6 @@
 (def all-directions (concat rook-directions bishop-directions))
 (def knight-directions [[2 1] [2 -1] [1 2] [1 -2]
                         [-2 1] [-2 -1] [-1 2] [-1 -2]])
-
 
 (defmulti get-pseudolegal-destinations (fn [game-state from-sq] (get-piece (:board game-state) from-sq)))
 
@@ -99,6 +103,36 @@
          (filter square-on-board?)
          (remove #(same-piece-color? piece (get-piece board %))))))
 
+(defn castling-squares [side player]
+  (case [side player]
+    [:ks :white] #{[7 4] [7 5] [7 6]}
+    [:qs :white] #{[7 1] [7 2] [7 3] [7 4]}
+    [:ks :black] #{[0 4] [0 5] [0 6]}
+    [:qs :black] #{[0 1] [0 2] [0 3] [0 4]}))
+
+(defn castling-squares-empty? [board side player]
+  (let [castling-squares (castling-squares side player)
+        king (condp = player
+               :white :K
+               :black :k)]
+    (->> castling-squares
+         (remove #(= king (get-piece board %)))
+         (every? (partial square-empty? board)))))
+
+(declare squares-attacked-by-player)
+
+(defn castling-squares-attacked?
+  [{:keys [board player] :as game-state} attacking-player side]
+  (let [castling-squares (castling-squares side player)]
+    (->>
+     (squares-attacked-by-player game-state attacking-player)
+     (my-any? castling-squares))))
+
+(defn castling-possible? [{:keys [board player] :as game-state} side]
+  (let [opponent (get-opponent player)]
+    (and (castling-squares-empty? board side player)
+         (not (castling-squares-attacked? game-state opponent side)))))
+
 ;; TODO: remove repetition. Multimethod dispatch on alternatives (eg. :r | :R) ???
 (defmethod get-pseudolegal-destinations :r
   [{:keys [board black-can-castle-ks black-can-castle-qs]} from-sq]
@@ -124,20 +158,46 @@
   [{board :board} from-sq]
   (set (mapcat (partial get-squares-in-direction board from-sq) all-directions)))
 
+;; (defmethod get-pseudolegal-destinations :k
+;;   [{:keys [board black-can-castle-ks black-can-castle-qs]} from-sq]
+;;   (->> all-directions
+;;        (map (partial add-squares from-sq))
+;;        (filter square-on-board?)
+;;        (remove #(same-piece-color? :k (get-piece board %)))
+;;        set))
+
+;; (defmethod get-pseudolegal-destinations :K
+;;   [{:keys [board white-can-castle-ks white-can-castle-qs]} from-sq]
+;;   (->> all-directions
+;;        (map (partial add-squares from-sq))
+;;        (filter square-on-board?)
+;;        (remove #(same-piece-color? :K (get-piece board %)))
+;;        set))
+
 (defmethod get-pseudolegal-destinations :k
-  [{:keys [board black-can-castle-ks black-can-castle-qs]} from-sq]
-  (->> all-directions
-       (map (partial add-squares from-sq))
-       (filter square-on-board?)
-       (remove #(same-piece-color? :k (get-piece board %)))
+  [{:keys [board black-can-castle-ks? black-can-castle-qs?] :as game-state} from-sq]
+  (->> (into [(when (and black-can-castle-ks? (castling-possible? game-state :ks))
+                [0 6])
+              (when (and black-can-castle-qs? (castling-possible? game-state :qs))
+                [0 2])]
+             (->> all-directions
+                  (map (partial add-squares from-sq))
+                  (filter square-on-board?)
+                  (remove #(same-piece-color? :k (get-piece board %)))))
+       (keep identity)
        set))
 
 (defmethod get-pseudolegal-destinations :K
-  [{:keys [board white-can-castle-ks white-can-castle-qs]} from-sq]
-  (->> all-directions
-       (map (partial add-squares from-sq))
-       (filter square-on-board?)
-       (remove #(same-piece-color? :K (get-piece board %)))
+  [{:keys [board white-can-castle-ks? white-can-castle-qs?] :as game-state} from-sq]
+  (->> (into [(when (and white-can-castle-ks? (castling-possible? game-state :ks))
+                [7 6])
+              (when (and white-can-castle-qs? (castling-possible? game-state :qs))
+                [7 2])]
+             (->> all-directions
+                  (map (partial add-squares from-sq))
+                  (filter square-on-board?)
+                  (remove #(same-piece-color? :K (get-piece board %)))))
+       (keep identity)
        set))
 
 ;; TODO: find more functional implementation
@@ -188,13 +248,21 @@
          (filter square-on-board?)
          set)))
 
+(defn remove-castling-from-game-state [game-state]
+  (merge game-state {:white-can-castle-ks? false
+                     :white-can-castle-qs? false
+                     :black-can-castle-ks? false
+                     :black-can-castle-qs? false}))
+
 ;; TODO: change from pseudolegal to legal destinations. Watch for infinite recursion
+;; TODO: find better solution to infinite recursion on game-state without castling
 (defn squares-attacked-by-player [{board :board :as game-state} player]
-  (->> board
-       occupied-squares
-       (filter #(= player (piece-color (get-piece board %))))
-       (mapcat (partial get-pseudolegal-destinations game-state))
-       set))
+  (let [game-state (remove-castling-from-game-state game-state)]
+    (->> board
+         occupied-squares
+         (filter #(= player (piece-color (get-piece board %))))
+         (mapcat (partial get-pseudolegal-destinations game-state))
+         set)))
 
 (defn in-check? [{:keys [board player] :as game-state}]
   (let [[attacked-king opponent] (condp = player
