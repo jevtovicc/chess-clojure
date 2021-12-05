@@ -162,34 +162,28 @@
   [{board :board} from-sq]
   (get-squares-in-directions board from-sq all-directions))
 
-;; TODO: find more functional implementation
 (defmethod get-pseudolegal-destinations :k
   [{:keys [board black-can-castle-ks? black-can-castle-qs?] :as game-state} from-sq]
-  (->> (into [(when (and black-can-castle-ks? (castling-possible? game-state :ks))
-                [0 6])
-              (when (and black-can-castle-qs? (castling-possible? game-state :qs))
-                [0 2])]
-             (->> all-directions
-                  (map (partial add-squares from-sq))
-                  (filter square-on-board?)
-                  (remove #(same-piece-color? :k (get-piece board %)))))
-       (keep identity)
-       set))
+  (cond-> []
+    (and black-can-castle-ks? (castling-possible? game-state :ks)) (conj [0 6])
+    (and black-can-castle-qs? (castling-possible? game-state :qs)) (conj [0 2])
+    :always (into (->> all-directions
+                       (map (partial add-squares from-sq))
+                       (filter square-on-board?)
+                       (remove #(same-piece-color? :k (get-piece board %)))))
+    :always set))
 
 (defmethod get-pseudolegal-destinations :K
   [{:keys [board white-can-castle-ks? white-can-castle-qs?] :as game-state} from-sq]
-  (->> (into [(when (and white-can-castle-ks? (castling-possible? game-state :ks))
-                [7 6])
-              (when (and white-can-castle-qs? (castling-possible? game-state :qs))
-                [7 2])]
-             (->> all-directions
-                  (map (partial add-squares from-sq))
-                  (filter square-on-board?)
-                  (remove #(same-piece-color? :K (get-piece board %)))))
-       (keep identity)
-       set))
+  (cond-> []
+    (and white-can-castle-ks? (castling-possible? game-state :ks)) (conj [7 6])
+    (and white-can-castle-qs? (castling-possible? game-state :qs)) (conj [7 2])
+    :always (into (->> all-directions
+                       (map (partial add-squares from-sq))
+                       (filter square-on-board?)
+                       (remove #(same-piece-color? :K (get-piece board %)))))
+    :always set))
 
-;; TODO: find more functional implementation
 (defmethod get-pseudolegal-destinations :p
   [{board :board en-passant :en-passant} from-sq]
   (let [not-moved? (= (first from-sq) 1)
@@ -197,23 +191,19 @@
         two-up (add-squares dir-up one-up)
         one-up-right (add-squares dir-up-right from-sq)
         one-up-left (add-squares dir-up-left from-sq)]
-    (->> [(when (square-empty? board one-up)
-            one-up)
-          (when (and not-moved? (square-empty? board one-up) (square-empty? board two-up))
-            two-up)
-          (when (and (not (square-empty? board one-up-left))
-                     (not (same-piece-color? :p (get-piece board one-up-left))))
-            one-up-left)
-          (when (and (not (square-empty? board one-up-right))
-                     (not (same-piece-color? :p (get-piece board one-up-right))))
-            one-up-right)
-          (when en-passant
-            ((keyword en-passant) notation->sq))]
-         (keep identity)
-         (filter square-on-board?)
-         set)))
+    (cond-> []
+      (square-empty? board one-up) (conj one-up)
+      (and not-moved?
+           (square-empty? board one-up)
+           (square-empty? board two-up)) (conj two-up)
+      (and (not (square-empty? board one-up-left))
+           (not (same-piece-color? :p (get-piece board one-up-left)))) (conj one-up-left)
+      (and (not (square-empty? board one-up-right))
+           (not (same-piece-color? :p (get-piece board one-up-right)))) (conj one-up-right)
+      en-passant (conj ((keyword en-passant) notation->sq))
+      :always (->> (filter square-on-board?)
+                   set))))
 
-;; TODO: find more functional implementation
 (defmethod get-pseudolegal-destinations :P
   [{board :board en-passant :en-passant} from-sq]
   (let [not-moved? (= (first from-sq) 6)
@@ -221,21 +211,18 @@
         two-down (add-squares dir-down one-down)
         one-down-right (add-squares dir-down-right from-sq)
         one-down-left (add-squares dir-down-left from-sq)]
-    (->> [(when (square-empty? board one-down)
-            one-down)
-          (when (and not-moved? (square-empty? board one-down) (square-empty? board two-down))
-            two-down)
-          (when (and (not (square-empty? board one-down-left))
-                     (not (same-piece-color? :P (get-piece board one-down-left))))
-            one-down-left)
-          (when (and (not (square-empty? board one-down-right))
-                     (not (same-piece-color? :P (get-piece board one-down-right))))
-            one-down-right)
-          (when en-passant
-            ((keyword en-passant) notation->sq))]
-         (keep identity)
-         (filter square-on-board?)
-         set)))
+    (cond-> []
+      (square-empty? board one-down) (conj one-down)
+      (and not-moved?
+           (square-empty? board one-down)
+           (square-empty? board two-down)) (conj two-down)
+      (and (not (square-empty? board one-down-left))
+           (not (same-piece-color? :P (get-piece board one-down-left)))) (conj one-down-left)
+      (and (not (square-empty? board one-down-right))
+           (not (same-piece-color? :P (get-piece board one-down-right)))) (conj one-down-right)
+      en-passant (conj ((keyword en-passant) notation->sq))
+      :always (->> (filter square-on-board?)
+                   set))))
 
 (defn remove-castling-from-game-state [game-state]
   (merge game-state {:white-can-castle-ks? false
@@ -274,3 +261,4 @@
        (mapcat (partial get-legal-destinations game-state))
        set
        empty?))
+
