@@ -61,6 +61,11 @@
     :white :black
     :black :white))
 
+(defn get-players-king [player]
+  (condp = player
+    :white :K
+    :black :k))
+
 ;; directions
 (def dir-up         [1 0])
 (def dir-down       [-1 0])
@@ -103,6 +108,9 @@
          (filter square-on-board?)
          (remove #(same-piece-color? piece (get-piece board %))))))
 
+(defn get-squares-in-directions [board from-sq dirs]
+  (set (mapcat (partial get-squares-in-direction board from-sq) dirs)))
+
 (defn castling-squares [side player]
   (case [side player]
     [:ks :white] #{[7 4] [7 5] [7 6]}
@@ -112,9 +120,7 @@
 
 (defn castling-squares-empty? [board side player]
   (let [castling-squares (castling-squares side player)
-        king (condp = player
-               :white :K
-               :black :k)]
+        king (get-players-king player)]
     (->> castling-squares
          (remove #(= king (get-piece board %)))
          (every? (partial square-empty? board)))))
@@ -124,9 +130,7 @@
 (defn castling-squares-attacked?
   [{:keys [board player] :as game-state} attacking-player side]
   (let [castling-squares (castling-squares side player)]
-    (->>
-     (squares-attacked-by-player game-state attacking-player)
-     (my-any? castling-squares))))
+    (my-any? castling-squares (squares-attacked-by-player game-state attacking-player))))
 
 (defn castling-possible? [{:keys [board player] :as game-state} side]
   (let [opponent (get-opponent player)]
@@ -136,28 +140,29 @@
 ;; TODO: remove repetition. Multimethod dispatch on alternatives (eg. :r | :R) ???
 (defmethod get-pseudolegal-destinations :r
   [{board :board} from-sq]
-  (set (mapcat (partial get-squares-in-direction board from-sq) rook-directions)))
+  (get-squares-in-directions board from-sq rook-directions))
 
 (defmethod get-pseudolegal-destinations :R
   [{board :board} from-sq]
-  (set (mapcat (partial get-squares-in-direction board from-sq) rook-directions)))
+  (get-squares-in-directions board from-sq rook-directions))
 
 (defmethod get-pseudolegal-destinations :b
   [{board :board} from-sq]
-  (set (mapcat (partial get-squares-in-direction board from-sq) bishop-directions)))
+  (get-squares-in-directions board from-sq bishop-directions))
 
 (defmethod get-pseudolegal-destinations :B
   [{board :board} from-sq]
-  (set (mapcat (partial get-squares-in-direction board from-sq) bishop-directions)))
+  (get-squares-in-directions board from-sq bishop-directions))
 
 (defmethod get-pseudolegal-destinations :q
   [{board :board} from-sq]
-  (set (mapcat (partial get-squares-in-direction board from-sq) all-directions)))
+  (get-squares-in-directions board from-sq all-directions))
 
 (defmethod get-pseudolegal-destinations :Q
   [{board :board} from-sq]
-  (set (mapcat (partial get-squares-in-direction board from-sq) all-directions)))
+  (get-squares-in-directions board from-sq all-directions))
 
+;; TODO: find more functional implementation
 (defmethod get-pseudolegal-destinations :k
   [{:keys [board black-can-castle-ks? black-can-castle-qs?] :as game-state} from-sq]
   (->> (into [(when (and black-can-castle-ks? (castling-possible? game-state :ks))
@@ -249,9 +254,8 @@
          set)))
 
 (defn in-check? [{:keys [board player] :as game-state}]
-  (let [[attacked-king opponent] (condp = player
-                                   :white [:K :black]
-                                   :black [:k :white])]
+  (let [attacked-king (get-players-king player)
+        opponent (get-opponent player)]
     (->> (squares-attacked-by-player game-state opponent)
          (my-any? #(= attacked-king (get-piece board %))))))
 
